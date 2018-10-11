@@ -1,0 +1,88 @@
+# Scrapping infomex
+
+
+library("rio")
+library("rvest")
+library("magrittr")
+library("readr")
+library("tibble")
+library("here")
+library("purrr")
+library("stringr")
+library("dplyr")
+library("tidyr")
+library("XML")
+library("readr")
+library("readxl")
+
+---
+  title: "Hackeando Infomex: técnicas de scrapeo de la plataforma de info pública"
+output: html_document
+---
+  
+### Instalemos R
+  
+# Obtiene tu versión de Ubuntu como variable de BASH
+  CODENAME=`grep CODENAME /etc/lsb-release | cut -c 18-`
+
+# Añade el respositorio de CRAN al archivo sources.list
+sudo sh -c 'echo "deb http://cran.rstudio.com/bin/linux/ubuntu $CODENAME" >> /etc/apt/sources.list'
+
+# Añade la llave GPG, para firma de seguridad.
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E084DAB9
+
+sudo apt-get update
+sudo apt-get install r-base r-dev   
+
+# Instalemos
+
+#install.packages("rio")
+#install.packages("rvest")
+
+
+data_list <- import_list("banobras_infomex.xls", setclass = "tbl", rbind = T)
+ids <- data_list %>% filter(!(str_detect(X__1, "Folio")))
+ids <- ids$X__1
+
+url_ids <- vector("list", length(ids))
+for (i in seq_along(ids)) { 
+  url_ids[[i]] <- paste0("https://www.infomex.org.mx/gobiernofederal/moduloPublico/verDetalleSolSinRespP.action?idFolioSol=", ids[[i]])
+}
+
+#Prueba 
+
+url <- "https://www.infomex.org.mx/gobiernofederal/moduloPublico/verDetalleSolSinRespP.action?idFolioSol=0401300010817"
+
+#View(html)
+html <- read_html(url)
+list <- html %>% html_nodes("#idComenInexInf") %>% html_text(.)
+
+#Usando selectores CSS para scrapear
+nodos <- html_nodes(html,'#idComenInexInf') %>% html_text(.)
+
+
+#Let's have a look at the rankings
+head(nodos)
+
+
+#ScrappingSolicitudes--------
+
+
+Scraplist <- (vector("list", length(ids)))
+htmlscrap <- (vector("list", length(ids)))
+
+url_ids <- flatten_chr(url_ids)
+
+for (i in url_ids) {
+  htmlscrap[[i]] <- read_html(i)
+  Scraplist[[i]] <- htmlscrap[[i]] %>% html_nodes("#idComenInexInf") %>% html_text(.)
+  cat("*")
+}
+
+
+
+coso <- as.data.frame(t(rbind(Scraplist[201:402])))
+coso2 <- as_data_frame(coso, rownames = "ids")
+coso2$V1 <- as.character(coso2$V1)
+write.csv(coso2, "infomex_buscable.csv")
+
